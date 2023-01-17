@@ -34,6 +34,7 @@ ENV=$(sed -e 's/^"//' -e 's/"$//' <<<"$(aws ssm get-parameter --name /SDLF/Misc/
 TEAM_NAME=$(sed -e 's/^"//' -e 's/"$//' <<<"$(jq '.[] | select(.ParameterKey=="pTeamName") | .ParameterValue' "$DIRNAME/parameters-$ENV".json)")
 PIPELINE_NAME=$(sed -e 's/^"//' -e 's/"$//' <<<"$(jq '.[] | select(.ParameterKey=="pPipelineName") | .ParameterValue' "$DIRNAME/parameters-$ENV".json)")
 STAGES=$(sed -e 's/^"//' -e 's/"$//' <<<"$(jq '.[] | select(.ParameterKey | endswith("StateMachineRepository")) | .ParameterKey | .[6:7]' "$DIRNAME/parameters-$ENV".json)")
+ENTRYPOINT=$(sed -e 's/^"//' -e 's/"$//' <<<"$(jq '.[] | select(.ParameterKey=="pEntryPoint") | .ParameterValue' "$DIRNAME/parameters-$ENV".json)")
 if ! "$sflag"
 then
     S3_BUCKET=$(sed -e 's/^"//' -e 's/"$//' <<<"$(aws ssm get-parameter --name /SDLF/S3/CFNBucket --profile "$PROFILE" --query "Parameter.Value")")
@@ -55,6 +56,7 @@ if ! aws s3 ls "$S3_BUCKET" --profile "$PROFILE"; then
   fi
 fi
 
+aws s3 cp "$DIRNAME/nested-stacks/template-stage-interface.yaml" "s3://$S3_BUCKET/pipeline/" --profile "$PROFILE"
 mkdir "$DIRNAME"/output
 aws cloudformation package --profile "$PROFILE" --template-file "$DIRNAME"/template.yaml --s3-bucket "$S3_BUCKET" --s3-prefix "$TEAM_NAME/pipeline/$PIPELINE_NAME" --output-template-file "$DIRNAME"/output/packaged-template.yaml
 
@@ -74,17 +76,23 @@ if ! aws cloudformation describe-stacks --profile "$PROFILE" --stack-name "$STAC
     --stack-name "$STACK_NAME"
 
   echo "Creating octagon-Pipelines-$ENV DynamoDB entry"
-  for s in "${STAGES[@]}"
+  while IFS= read -r s
   do
       PIPELINE_STAGE=$(echo stage-"$s" | awk '{print tolower($0)}')
+      if [[ "$PIPELINE_STAGE" == "$ENTRYPOINT" ]]; then
+          ENTRYPOINT_STAGE=true
+      else
+          ENTRYPOINT_STAGE=false
+      fi
       PIPELINE_JSON=$( jq -n \
                           --arg pn "$TEAM_NAME-$PIPELINE_NAME-$PIPELINE_STAGE" \
-                          '{"name": {"S": $pn}, "type": {"S": "TRANSFORMATION"}, "status": {"S": "ACTIVE"}, "version": {"N": "1"}}' )
+                          --arg ep "$ENTRYPOINT_STAGE" \
+                          '{"name": {"S": $pn}, "type": {"S": "TRANSFORMATION"}, "status": {"S": "ACTIVE"}, "entrypoint": {"S": $ep}, "version": {"N": "1"}}' )
       aws dynamodb put-item --profile "$PROFILE" \
         --table-name octagon-Pipelines-"$ENV" \
         --item "$PIPELINE_JSON"
       echo "$TEAM_NAME-$PIPELINE_NAME-$PIPELINE_STAGE DynamoDB Pipeline entry created"
-  done
+  done <<< "$STAGES"
 else
   echo -e "Stack exists, attempting update ..."
 
@@ -117,12 +125,18 @@ else
   echo "Finished create/update successfully!"
 
   echo "Updating octagon-Pipelines-$ENV DynamoDB entry"
-  for s in "${STAGES[@]}"
+  while IFS= read -r s
   do
       PIPELINE_STAGE=$(echo stage-"$s" | awk '{print tolower($0)}')
+      if [[ "$PIPELINE_STAGE" == "$ENTRYPOINT" ]]; then
+          ENTRYPOINT_STAGE=true
+      else
+          ENTRYPOINT_STAGE=false
+      fi
       PIPELINE_JSON=$( jq -n \
                           --arg pn "$TEAM_NAME-$PIPELINE_NAME-$PIPELINE_STAGE" \
-                          '{"name": {"S": $pn}, "type": {"S": "TRANSFORMATION"}, "status": {"S": "ACTIVE"}, "version": {"N": "1"}}' )
+                          --arg ep "$ENTRYPOINT_STAGE" \
+                          '{"name": {"S": $pn}, "type": {"S": "TRANSFORMATION"}, "status": {"S": "ACTIVE"}, "entrypoint": {"S": $ep}, "version": {"N": "1"}}' )
       echo "$PIPELINE_JSON"
       ATTRIBUTES_JSON='{"#N": "name"}'
       set +e
@@ -146,5 +160,5 @@ else
       fi
         
       echo "$TEAM_NAME-$PIPELINE_NAME-$PIPELINE_STAGE DynamoDB Pipeline entry created"
-  done
+  done <<< "$STAGES"
 fi
