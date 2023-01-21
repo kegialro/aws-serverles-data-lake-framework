@@ -101,3 +101,8 @@ else
     --stack-name "$STACK_NAME" 
   echo "Finished create/update successfully!"
 fi
+
+echo "Loading Deequ scripts ..."
+ARTIFACTS_BUCKET=$(sed -e 's/^"//' -e 's/"$//' <<<"$(aws ssm get-parameter --name /SDLF/S3/ArtifactsBucket --profile "$PROFILE" --query "Parameter.Value")")
+aws s3 cp ./scripts/deequ/jar/deequ-1.2.2-spark-2.4.jar s3://"$ARTIFACTS_BUCKET"/deequ/jars/ --profile "$PROFILE"
+aws s3 sync ./scripts/deequ/resources/ s3://"$ARTIFACTS_BUCKET"/deequ/scripts/ --profile "$PROFILE"
