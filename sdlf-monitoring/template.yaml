@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Resources to be created by the common stack
+
+Parameters:
+  pApplicationName:
+    Description: Name of the application (all lowercase, no symbols or spaces)
+    Type: String
+    AllowedPattern: "[a-z0-9]{2,8}"
+    Default: datalake
+  pCloudTrailEnabled:
+    Description: To Deploy CloudTrail, turn this parameter to true
+    Type: String
+    AllowedValues: ["false", "true"]
+    Default: "true"
+  pCognitoAdminEmail:
+    Description: Email address of the Cognito admin
+    Type: String
+    Default: nobody@amazon.com
+  pCustomBucketPrefix:
+    Description: S3 Bucket Prefix if different from default. Must be a valid S3 Bucket name
+    Type: String
+    Default: sdlf
+  pElasticSearchDomainAdminEmail:
+    Description: Email address of the ElasticSearch domain admin
+    Type: String
+    Default: nobody@amazon.com
+  pElasticSearchEnabled:
+    Description: To Deploy ElasticSearch, turn this parameter to true and enter valid email addresses below
+    Type: String
+    AllowedValues: ["false", "true"]
+    Default: "false"
+  pEnvironment:
+    Description: Environment name
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /SDLF/Misc/pEnv
+  pOrganizationName:
+    Description: Name of the organization (all lowercase, no symbols or spaces)
+    Type: String
+    AllowedPattern: "[a-z0-9]{2,9}"
+  pSNSNotificationsEmail:
+    Description: Email address for SNS notifications
+    Type: String
+    Default: nobody@amazon.com
+  pCloudWatchLogsRetentionInDays:
+    Description: The number of days log events are kept in CloudWatch Logs
+    Type: Number
+    Default: 30
+    AllowedValues:
+      [
+        1,
+        3,
+        5,
+        7,
+        14,
+        30,
+        60,
+        90,
+        120,
+        150,
+        180,
+        365,
+        400,
+        545,
+        731,
+        1827,
+        3653,
+      ]
+
+Conditions:
+  DeployCloudTrail: !Equals [!Ref pCloudTrailEnabled, "true"]
+  DeployElasticSearch: !Equals [!Ref pElasticSearchEnabled, "true"]
+
+Resources:
+  ######## KMS #########
+  rKMSStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./nested-stacks/template-kms.yaml
+      Tags:
+        - Key: tagging-policy
+          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+
+  ######## CLOUDTRAIL #########
+  rCloudTrailStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: rS3Stack
+    Condition: DeployCloudTrail
+    Properties:
+      TemplateURL: ./nested-stacks/template-cloudtrail.yaml
+      Parameters:
+        pApplicationName: !Ref pApplicationName
+        pCustomBucketPrefix: !Ref pCustomBucketPrefix
+        pEnvironment: !Ref pEnvironment
+        pKMSKeyId: !GetAtt [rKMSStack, Outputs.oKMSKeyId]
+        pOrganizationName: !Ref pOrganizationName
+      Tags:
+        - Key: tagging-policy
+          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+
+  ######## SNS AND NOTIFICATIONS #########
+  rSNSStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: rDynamoStack
+    Properties:
+      TemplateURL: ./nested-stacks/template-sns.yaml
+      Parameters:
+        pEnvironment: !Ref pEnvironment
+        pKMSKeyId: !GetAtt [rKMSStack, Outputs.oKMSKeyId]
+        pLambdaCatalog: !GetAtt [rS3Stack, Outputs.oLambdaCatalog]
+        pLambdaRouting: !GetAtt [rS3Stack, Outputs.oLambdaRouting]
+        pSNSNotificationsEmail: !Ref pSNSNotificationsEmail
+      Tags:
+        - Key: tagging-policy
+          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+
+  ######## KIBANA STACK #########
+  rKibanaStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: DeployElasticSearch
+    Properties:
+      TemplateURL: "./nested-stacks/template-kibana.yaml"
+      Parameters:
+        CognitoAdminEmail: !Ref pCognitoAdminEmail
+        DomainAdminEmail: !Ref pElasticSearchDomainAdminEmail
+        LambdaCatalog: !GetAtt [rS3Stack, Outputs.oLambdaCatalog]
+        LambdaRouting: !GetAtt [rS3Stack, Outputs.oLambdaRouting]
+        LambdaCatalogRedrive: !GetAtt [rS3Stack, Outputs.oLambdaCatalogRedrive]
+        LambdaRoutingRedrive: !GetAtt [rS3Stack, Outputs.oLambdaRoutingRedrive]
+        LambdaStep1: !GetAtt [rGlueReplicationStack, Outputs.oLambdaStep1]
+        LambdaJobCheckStep:
+          !GetAtt [rGlueReplicationStack, Outputs.oLambdaJobCheckStep]
+        LambdaStep2: !GetAtt [rGlueReplicationStack, Outputs.oLambdaStep2]
+        LambdaReplicate:
+          !GetAtt [rGlueReplicationStack, Outputs.oLambdaReplicate]
+        KMSKeyId: !GetAtt [rKMSStack, Outputs.oKMSKeyId]
+        SpokeAccounts: ""
+      Tags:
+        - Key: tagging-policy
+          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+
+  ######## SSM OUTPUTS #########
+  rElasticSearchEnabledSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /SDLF/ElasticSearch/Enabled
+      Type: String
+      Value: !Ref pElasticSearchEnabled
+      Description: Boolean for wether ElasticSearch is enabled
+  rUpdateSubscriptionFilterSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /SDLF/Lambda/UpdateCloudWatchSubscriptionFilterFunctionArn
+      Type: String
+      Value:
+        !If [
+          DeployElasticSearch,
+          !GetAtt [rKibanaStack, Outputs.oUpdateSubscriptionFilterArn],
+          None,
+        ]
+      Description: ARN of the Lambda function used by the Custom Resource to update CloudWatch subscription filters
+  rKibanaLambdaSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /SDLF/Lambda/KibanaLambdaArn
+      Type: String
+      Value:
+        !If [
+          DeployElasticSearch,
+          !GetAtt [rKibanaStack, Outputs.oKibanaLambdaArn],
+          None,
+        ]
+      Description: ARN of the Lambda function that collates logs
