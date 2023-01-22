@@ -1,27 +1,62 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Resources to be created to manage a team
+Description: Resources to be created by the common stack
 
 Parameters:
   pApplicationName:
-    Description: Name of the application
+    Description: Name of the application (all lowercase, no symbols or spaces)
+    Type: String
+    AllowedPattern: "[a-z0-9]{2,8}"
+    Default: datalake
+  pCustomBucketPrefix:
+    Description: S3 Bucket Prefix if different from default. Must be a valid S3 Bucket name
+    Type: String
+    Default: sdlf
+  pDataLakeAdminRoleArn:
+    Description: Lake Formation Admin Role Arn
     Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/Misc/pApp
-  pAnalyticsBucket:
-    Description: The analytics bucket for the solution
+    Default: /SDLF/IAM/DataLakeAdminRoleArn
+  pEnvironment:
+    Description: Environment name
     Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/S3/AnalyticsBucket
-  pCentralBucket:
-    Description: The central bucket for the solution
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/S3/CentralBucket
+    Default: /SDLF/Misc/pEnv
+  pNumBuckets:
+    Description: Number of data lake buckets (3 or 1)
+    Default: "3"
+    Type: String
+    AllowedValues: ["3", "1"]
+    ConstraintDescription: Must specify 3 or 1
+  pOrganizationName:
+    Description: Name of the organization (all lowercase, no symbols or spaces)
+    Type: String
+    AllowedPattern: "[a-z0-9]{2,9}"
+  pCloudWatchLogsRetentionInDays:
+    Description: The number of days log events are kept in CloudWatch Logs
+    Type: Number
+    Default: 30
+    AllowedValues:
+      [
+        1,
+        3,
+        5,
+        7,
+        14,
+        30,
+        60,
+        90,
+        120,
+        150,
+        180,
+        365,
+        400,
+        545,
+        731,
+        1827,
+        3653,
+      ]
   pCFNBucket:
     Description: The CloudFormation bucket for the solution
     Type: AWS::SSM::Parameter::Value<String>
     Default: /SDLF/S3/CFNBucket
-  pDataQualityStateMachine:
-    Description: The data quality state machine
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/SM/DataQualityStateMachine
   pDatalakeLibraryRepositoryName:
     Description: Name of the repository containing the code for the Datalake Library.
     Type: String
@@ -34,10 +69,6 @@ Parameters:
     Description: Name to give the Lambda Layer containing the libraries installed through Pip.
     Type: String
     Default: default-pip-libraries
-  pEnvironment:
-    Description: Environment name
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/Misc/pEnv
   pLibrariesBranchName:
     Description: Name of the default branch for Python libraries
     Type: String
@@ -46,18 +77,10 @@ Parameters:
     Description: "[OPTIONAL] The minimum code coverage percentage that is required for the pipeline to proceed to the next stage. Specify only if `pEnforceCodeCoverage` is set to 'true'."
     Type: String
     Default: 80
-  pOrganizationName:
-    Description: Name of the organization owning the datalake
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/Misc/pOrg
   pPipLibrariesRepositoryName:
     Description: The repository containing requirements.txt
     Type: String
     Default: sdlf-pipLibrary
-  pPipelineBucket:
-    Description: The artifactory bucket used by CodeBuild and CodePipeline
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/S3/ArtifactsBucket
   pRunCodeCoverage:
     Description: "Creates code coverage reports from the unit tests included in `pDatalakeLibraryRepositoryName`. Enforces the minimum threshold specified in `pMinTestCoverage`"
     Type: String
@@ -71,16 +94,77 @@ Parameters:
     Description: Shared DevOps Account Id
     Type: AWS::SSM::Parameter::Value<String>
     Default: /SDLF/Misc/DevOpsAccountId
-  pStageBucket:
-    Description: The stage bucket for the solution
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/S3/StageBucket
   pTeamName:
     Description: Name of the team (all lowercase, no symbols or spaces)
     Type: String
     AllowedPattern: "[a-z0-9]{2,12}"
+    Default: data
+
+Conditions:
+  DefaultTeam: !Equals [!Ref pTeamName, "data"]
 
 Resources:
+  rRoleLambdaExecution:
+    Type: AWS::IAM::Role
+    Condition: DefaultTeam
+    Properties:
+      RoleName: sdlf-routing
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: sdlf-routing
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/sdlf-*
+              - Effect: Allow
+                Action:
+                  - sqs:DeleteMessage
+                  - sqs:DeleteMessageBatch
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ListQueues
+                  - sqs:ListDeadLetterSourceQueues
+                  - sqs:ListQueueTags
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
+                  - sqs:SendMessageBatch
+                Resource:
+                  - !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:sdlf-*
+              - Effect: Allow
+                Action:
+                  - events:PutEvents
+                Resource:
+                  - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+              - Effect: Allow
+                Action:
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:DescribeTable
+                  - dynamodb:GetItem
+                  - dynamodb:GetRecords
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/octagon-*
+
   ######## KMS #########
   rKMSStack:
     Type: AWS::CloudFormation::Stack
@@ -90,9 +174,80 @@ Resources:
         pEnvironment: !Ref pEnvironment
         pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
         pTeamName: !Ref pTeamName
+        pRoleLambdaExecutionArn: !If [DefaultTeam, !GetAtt rRoleLambdaExecution.Arn, "{{resolve:ssm:/SDLF/Misc/rRoleLambdaExecution:1}}"]
       Tags:
         - Key: tagging-policy
           Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-${pTeamName}
+
+  rRoleLambdaExecutionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: DefaultTeam
+    Properties:
+      ManagedPolicyName: sdlf-routing-kms
+      Roles:
+        - sdlf-routing
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - kms:CreateGrant
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:GenerateDataKey*
+              - kms:ReEncrypt*
+            Resource: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
+
+  ######## S3 #########
+  rS3Stack:
+    Type: AWS::CloudFormation::Stack
+    Condition: DefaultTeam
+    Properties:
+      TemplateURL: ./nested-stacks/template-s3.yaml
+      Parameters:
+        pApplicationName: !Ref pApplicationName
+        pCustomBucketPrefix: !Ref pCustomBucketPrefix
+        pEnvironment: !Ref pEnvironment
+        pKMSInfraKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
+        pKMSDataKeyId: !GetAtt [rKMSStack, Outputs.oKMSDataKeyId]
+        pNumBuckets: !Ref pNumBuckets
+        pOrganizationName: !Ref pOrganizationName
+        pCloudWatchLogsRetentionInDays: !Ref pCloudWatchLogsRetentionInDays
+        pRoleLambdaExecutionArn: !GetAtt rRoleLambdaExecution.Arn
+      Tags:
+        - Key: tagging-policy
+          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+
+  ######## DYNAMODB #########
+  rDynamoStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: DefaultTeam
+    DependsOn: rS3Stack
+    Properties:
+      TemplateURL: ./nested-stacks/template-dynamo.yaml
+      Parameters:
+        pEnvironment: !Ref pEnvironment
+        pKMSKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
+      Tags:
+        - Key: tagging-policy
+          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+
+  ######## GLUE REPLICATION #########
+  rGlueReplicationStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: DefaultTeam
+    DependsOn: rDynamoStack
+    Properties:
+      TemplateURL: ./nested-stacks/template-glue.yaml
+      Parameters:
+        pDataLakeAdminRoleArn: !Ref pDataLakeAdminRoleArn
+        pEnvironment: !Ref pEnvironment
+        pKMSKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
+        pCloudWatchLogsRetentionInDays: !Ref pCloudWatchLogsRetentionInDays
+      Tags:
+        - Key: tagging-policy
+          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
 
   ######## IAM #########
   rIAMStack:
@@ -100,18 +255,17 @@ Resources:
     Properties:
       TemplateURL: ./nested-stacks/template-iam.yaml
       Parameters:
-        pAnalyticsBucket: !Ref pAnalyticsBucket
+        pAnalyticsBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oAnalyticsBucket], "{{resolve:ssm:/SDLF/S3/AnalyticsBucket:1}}"]
         pApplicationName: !Ref pApplicationName
-        pCentralBucket: !Ref pCentralBucket
+        pCentralBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oCentralBucket], "{{resolve:ssm:/SDLF/S3/CentralBucket:1}}"]
         pCFNBucket: !Ref pCFNBucket
-        pDataQualityStateMachine: !Ref pDataQualityStateMachine
         pEnvironment: !Ref pEnvironment
         pKMSInfraKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
         pKMSDataKeyId: !GetAtt [rKMSStack, Outputs.oKMSDataKeyId]
         pOrganizationName: !Ref pOrganizationName
-        pPipelineBucket: !Ref pPipelineBucket
+        pPipelineBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oPipelineBucket], "{{resolve:ssm:/SDLF/S3/ArtifactsBucket:1}}"]
         pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-        pStageBucket: !Ref pStageBucket
+        pStageBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oStageBucket], "{{resolve:ssm:/SDLF/S3/StageBucket:1}}"]
         pTeamName: !Ref pTeamName
       Tags:
         - Key: tagging-policy
@@ -123,9 +277,9 @@ Resources:
     Properties:
       TemplateURL: ./nested-stacks/template-cicd.yaml
       Parameters:
-        pAnalyticsBucket: !Ref pAnalyticsBucket
+        pAnalyticsBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oAnalyticsBucket], "{{resolve:ssm:/SDLF/S3/AnalyticsBucket:1}}"]
         pApplicationName: !Ref pApplicationName
-        pCentralBucket: !Ref pCentralBucket
+        pCentralBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oCentralBucket], "{{resolve:ssm:/SDLF/S3/CentralBucket:1}}"]
         pCFNBucket: !Ref pCFNBucket
         pCloudWatchRepositoryTriggerRoleArn:
           !GetAtt [rIAMStack, Outputs.oCloudWatchRepositoryTriggerRoleArn]
@@ -144,11 +298,11 @@ Resources:
         pLibrariesBranchName: !Ref pLibrariesBranchName
         pMinimumTestCoverage: !Ref pMinTestCoverage
         pOrganizationName: !Ref pOrganizationName
-        pPipelineBucket: !Ref pPipelineBucket
+        pPipelineBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oPipelineBucket], "{{resolve:ssm:/SDLF/S3/ArtifactsBucket:1}}"]
         pPipLibrariesRepositoryName: !Ref pPipLibrariesRepositoryName
         pRunCodeCoverage: !Ref pRunCodeCoverage
         pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-        pStageBucket: !Ref pStageBucket
+        pStageBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oStageBucket], "{{resolve:ssm:/SDLF/S3/StageBucket:1}}"]
         pSNSNotificationsEmail: !Ref pSNSNotificationsEmail
         pTeamName: !Ref pTeamName
         pTransformValidateRoleArn:
@@ -156,3 +310,29 @@ Resources:
       Tags:
         - Key: tagging-policy
           Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-${pTeamName}
+
+  ######## SSM OUTPUTS #########
+  rOrganizationSsm:
+    Type: AWS::SSM::Parameter
+    Condition: DefaultTeam
+    Properties:
+      Name: /SDLF/Misc/pOrg
+      Type: String
+      Value: !Ref pOrganizationName
+      Description: Name of the Organization owning the datalake
+  rApplicationSsm:
+    Type: AWS::SSM::Parameter
+    Condition: DefaultTeam
+    Properties:
+      Name: /SDLF/Misc/pApp
+      Type: String
+      Value: !Ref pApplicationName
+      Description: Name of the Application
+  rRoleLambdaExecutionSsm:
+    Type: AWS::SSM::Parameter
+    Condition: DefaultTeam
+    Properties:
+      Name: /SDLF/Misc/rRoleLambdaExecution
+      Type: String
+      Value: !GetAtt rRoleLambdaExecution.Arn
+      Description: sdlf-routing lambda role

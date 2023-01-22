@@ -8,6 +8,8 @@ Parameters:
     Type: String
   pTeamName:
     Type: String
+  pRoleLambdaExecutionArn:
+    Type: String
 
 Resources:
   ######## KMS #########
@@ -30,7 +32,8 @@ Resources:
           - Sid: Allow administration of the key
             Effect: Allow
             Principal:
-              AWS: [!Sub "arn:aws:iam::${AWS::AccountId}:root"]
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
             Action: kms:*
             Resource: "*"
           - Sid: Allow CloudWatch alarms access
@@ -38,6 +41,7 @@ Resources:
             Principal:
               Service:
                 - cloudwatch.amazonaws.com
+                - cloudtrail.amazonaws.com
                 - events.amazonaws.com
             Action:
               - kms:Decrypt
@@ -68,11 +72,19 @@ Resources:
               StringEquals:
                 kms:CallerAccount: !Ref AWS::AccountId
                 kms:ViaService: !Sub sns.${AWS::Region}.amazonaws.com
+          - Sid: Allow S3 Events access
+            Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action:
+              - kms:Decrypt
+              - kms:GenerateDataKey
+            Resource: "*"
           - Sid: Allow Routing Lambda and Shared DevOps access
             Effect: Allow
             Principal:
               AWS:
-                - !Sub arn:aws:iam::${AWS::AccountId}:role/sdlf-routing
+                - !Ref pRoleLambdaExecutionArn
                 - !Sub arn:aws:iam::${pSharedDevOpsAccountId}:role/sdlf-cicd-team-codecommit-${pEnvironment}-${pTeamName}
             Action:
               - kms:Decrypt
@@ -87,7 +99,7 @@ Resources:
             Effect: Allow
             Principal:
               AWS:
-                - !Sub arn:aws:iam::${AWS::AccountId}:role/sdlf-routing
+                - !Ref pRoleLambdaExecutionArn
                 - !Sub arn:aws:iam::${pSharedDevOpsAccountId}:role/sdlf-cicd-team-codecommit-${pEnvironment}-${pTeamName}
             Action:
               - kms:CreateGrant
@@ -97,6 +109,40 @@ Resources:
             Condition:
               Bool:
                 kms:GrantIsForAWSResource: true
+          - Sid: Allow ElasticSearch access
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action:
+              - kms:CreateGrant
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:GenerateDataKey*
+              - kms:ReEncrypt*
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:CallerAccount: !Ref AWS::AccountId
+                kms:ViaService: !Sub es.${AWS::Region}.amazonaws.com
+              Bool:
+                kms:GrantIsForAWSResource: true
+          - Sid: Allow DynamoDB access
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action:
+              - kms:CreateGrant
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:GenerateDataKey*
+              - kms:ReEncrypt*
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:CallerAccount: !Ref AWS::AccountId
+                kms:ViaService: !Sub dynamodb.${AWS::Region}.amazonaws.com
 
   rKMSInfraKeyAlias:
     Type: AWS::KMS::Alias
@@ -119,7 +165,8 @@ Resources:
             Action: kms:*
             Effect: Allow
             Principal:
-              AWS: [!Sub "arn:aws:iam::${AWS::AccountId}:root"]
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
             Resource: "*"
           - Sid: Allow Lake Formation permissions
             Action:
@@ -131,9 +178,7 @@ Resources:
             Effect: Allow
             Principal:
               AWS:
-                [
-                  !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/lakeformation.amazonaws.com/AWSServiceRoleForLakeFormationDataAccess",
-                ]
+                - !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/lakeformation.amazonaws.com/AWSServiceRoleForLakeFormationDataAccess"
             Resource: "*"
 
   rKMSDataKeyAlias:
@@ -183,7 +228,7 @@ Resources:
             "HttpPutResponseHopLimit": 1
           }
         }
-
+  
   ######## SSM #########
   rKMSInfraKeySsm:
     Type: AWS::SSM::Parameter

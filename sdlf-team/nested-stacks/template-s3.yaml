@@ -9,7 +9,9 @@ Parameters:
     Type: String
   pEnvironment:
     Type: String
-  pKMSKeyId:
+  pKMSDataKeyId:
+    Type: String
+  pKMSInfraKeyId:
     Type: String
   pNumBuckets:
     Type: String
@@ -17,6 +19,8 @@ Parameters:
     Type: String
   pCloudWatchLogsRetentionInDays:
     Type: Number
+  pRoleLambdaExecutionArn:
+    Type: String
 
 Conditions:
   CreateMultipleBuckets: !Equals [!Ref pNumBuckets, "3"]
@@ -27,7 +31,7 @@ Globals:
   Function:
     Runtime: python3.9
     Handler: lambda_function.lambda_handler
-    KmsKeyArn: !Ref pKMSKeyId
+    KmsKeyArn: !Ref pKMSInfraKeyId
 
 Resources:
   ####### S3 Buckets #########
@@ -335,7 +339,7 @@ Resources:
         deadLetterTargetArn: !GetAtt rDeadLetterQueueCatalog.Arn
         maxReceiveCount: 1
       VisibilityTimeout: 60
-      KmsMasterKeyId: !Ref pKMSKeyId
+      KmsMasterKeyId: !Ref pKMSInfraKeyId
 
   rDeadLetterQueueCatalog:
     Type: AWS::SQS::Queue
@@ -343,7 +347,7 @@ Resources:
       QueueName: sdlf-catalog-dlq
       MessageRetentionPeriod: 1209600
       VisibilityTimeout: 60
-      KmsMasterKeyId: !Ref pKMSKeyId
+      KmsMasterKeyId: !Ref pKMSInfraKeyId
 
   rQueueRouting:
     Type: AWS::SQS::Queue
@@ -353,7 +357,7 @@ Resources:
         deadLetterTargetArn: !GetAtt rDeadLetterQueueRouting.Arn
         maxReceiveCount: 1
       VisibilityTimeout: 60
-      KmsMasterKeyId: !Ref pKMSKeyId
+      KmsMasterKeyId: !Ref pKMSInfraKeyId
 
   rDeadLetterQueueRouting:
     Type: AWS::SQS::Queue
@@ -361,7 +365,7 @@ Resources:
       QueueName: sdlf-routing-dlq
       MessageRetentionPeriod: 1209600
       VisibilityTimeout: 60
-      KmsMasterKeyId: !Ref pKMSKeyId
+      KmsMasterKeyId: !Ref pKMSInfraKeyId
 
   rQueueLambdaCatalogEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -392,7 +396,7 @@ Resources:
       Description: Catalogs S3 Put and Delete to ObjectMetaDataCatalog
       MemorySize: 256
       Timeout: 60
-      Role: !GetAtt rRoleLambdaExecution.Arn
+      Role: !Ref pRoleLambdaExecutionArn
 
   rLambdaRouting:
     Type: AWS::Serverless::Function
@@ -409,14 +413,14 @@ Resources:
       Description: Routes S3 PutObject Logs to the relevant StageA Queue
       MemorySize: 256
       Timeout: 60
-      Role: !GetAtt rRoleLambdaExecution.Arn
+      Role: !Ref pRoleLambdaExecutionArn
 
   rLambdaRoutingLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${rLambdaRouting}
       RetentionInDays: !Ref pCloudWatchLogsRetentionInDays
-      KmsKeyId: !Ref pKMSKeyId
+      KmsKeyId: !Ref pKMSInfraKeyId
 
   rLambdaCatalogRedrive:
     Type: AWS::Serverless::Function
@@ -430,14 +434,14 @@ Resources:
       Description: Redrives Failed S3 Put/Delete to Catalog Lambda
       MemorySize: 256
       Timeout: 60
-      Role: !GetAtt rRoleLambdaExecution.Arn
+      Role: !Ref pRoleLambdaExecutionArn
 
   rLambdaCatalogRedriveLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${rLambdaCatalogRedrive}
       RetentionInDays: !Ref pCloudWatchLogsRetentionInDays
-      KmsKeyId: !Ref pKMSKeyId
+      KmsKeyId: !Ref pKMSInfraKeyId
 
   rLambdaRoutingRedrive:
     Type: AWS::Serverless::Function
@@ -451,13 +455,13 @@ Resources:
       Description: Redrives Failed S3 PutObject Logs to the routing queue
       MemorySize: 256
       Timeout: 60
-      Role: !GetAtt rRoleLambdaExecution.Arn
+      Role: !Ref pRoleLambdaExecutionArn
   rLambdaRoutingRedriveLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${rLambdaRoutingRedrive}
       RetentionInDays: !Ref pCloudWatchLogsRetentionInDays
-      KmsKeyId: !Ref pKMSKeyId
+      KmsKeyId: !Ref pKMSInfraKeyId
 
   rQueueCatalogPolicy:
     Type: AWS::SQS::QueuePolicy
@@ -508,81 +512,12 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !GetAtt rRoleLambdaExecution.Arn
+              AWS: !Ref pRoleLambdaExecutionArn
             Action:
               - SQS:SendMessage
             Resource: !GetAtt rQueueRouting.Arn
       Queues:
         - !Ref rQueueRouting
-
-  rRoleLambdaExecution:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: sdlf-routing
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Path: /
-      Policies:
-        - PolicyName: sdlf-routing
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/sdlf-*
-              - Effect: Allow
-                Action:
-                  - sqs:DeleteMessage
-                  - sqs:DeleteMessageBatch
-                  - sqs:GetQueueAttributes
-                  - sqs:GetQueueUrl
-                  - sqs:ListQueues
-                  - sqs:ListDeadLetterSourceQueues
-                  - sqs:ListQueueTags
-                  - sqs:ReceiveMessage
-                  - sqs:SendMessage
-                  - sqs:SendMessageBatch
-                Resource:
-                  - !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:sdlf-*
-              - Effect: Allow
-                Action:
-                  - events:PutEvents
-                Resource:
-                  - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-              - Effect: Allow
-                Action:
-                  - dynamodb:BatchGetItem
-                  - dynamodb:BatchWriteItem
-                  - dynamodb:DeleteItem
-                  - dynamodb:DescribeTable
-                  - dynamodb:GetItem
-                  - dynamodb:GetRecords
-                  - dynamodb:PutItem
-                  - dynamodb:Query
-                  - dynamodb:Scan
-                  - dynamodb:UpdateItem
-                Resource:
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/octagon-*
-              - Effect: Allow
-                Action:
-                  - kms:CreateGrant
-                  - kms:Decrypt
-                  - kms:DescribeKey
-                  - kms:Encrypt
-                  - kms:GenerateDataKey*
-                  - kms:ReEncrypt*
-                Resource: !Ref pKMSKeyId
 
   ####### SSM #######
   rS3ArtifactBucketSsm:

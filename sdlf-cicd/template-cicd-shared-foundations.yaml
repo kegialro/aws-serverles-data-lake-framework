@@ -12,9 +12,6 @@ Parameters:
     Type: String
     AllowedPattern: (\d{12}|^$)
     ConstraintDescription: Must be an AWS account ID
-  pFoundationsRepository:
-    Type: String
-    Default: sdlf-foundations
   pTeamFoundationsRepository:
     Type: String
     Default: sdlf-team
@@ -136,7 +133,6 @@ Resources:
                   - codecommit:List*
                   - codecommit:UploadArchive
                 Resource:
-                  - !Sub arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${pFoundationsRepository}
                   - !Sub arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${pTeamFoundationsRepository}
               - Effect: Allow
                 Action:
@@ -170,7 +166,6 @@ Resources:
         detail-type:
           - CodeCommit Repository State Change
         resources:
-          - !Sub arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${pFoundationsRepository}
           - !Sub arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${pTeamFoundationsRepository}
         detail:
           event:

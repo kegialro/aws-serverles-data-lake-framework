@@ -11,7 +11,7 @@ xflag=false
 aflag=false
 
 DIRNAME=$PWD
-declare -a REPOSITORIES=("sdlf-foundations" "sdlf-team" "sdlf-pipeline" "sdlf-dataset" "sdlf-datalakeLibrary" "sdlf-pipLibrary" "sdlf-stageA" "sdlf-stageB" "sdlf-utils")
+declare -a REPOSITORIES=("sdlf-team" "sdlf-pipeline" "sdlf-dataset" "sdlf-datalakeLibrary" "sdlf-pipLibrary" "sdlf-stageA" "sdlf-stageB" "sdlf-utils")
 
 usage () { echo "
     -h -- Opens up this help message

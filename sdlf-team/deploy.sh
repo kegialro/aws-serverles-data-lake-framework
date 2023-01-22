@@ -25,13 +25,13 @@ do
     esac
 done
 
+ENV=$(sed -e 's/^"//' -e 's/"$//' <<<"$(aws ssm get-parameter --name /SDLF/Misc/pEnv --profile "$PROFILE" --query "Parameter.Value")")
+TEAM_NAME=$(sed -e 's/^"//' -e 's/"$//' <<<"$(jq '.[] | select(.ParameterKey=="pTeamName") | .ParameterValue' "$DIRNAME/parameters-$ENV".json)")
 if ! "$pflag"
 then
     echo "-p not specified, using default..." >&2
     PROFILE="default"
 fi
-ENV=$(sed -e 's/^"//' -e 's/"$//' <<<"$(aws ssm get-parameter --name /SDLF/Misc/pEnv --profile "$PROFILE" --query "Parameter.Value")")
-TEAM_NAME=$(sed -e 's/^"//' -e 's/"$//' <<<"$(jq '.[] | select(.ParameterKey=="pTeamName") | .ParameterValue' "$DIRNAME/parameters-$ENV".json)")
 if ! "$sflag"
 then
     S3_BUCKET=$(sed -e 's/^"//' -e 's/"$//' <<<"$(aws ssm get-parameter --name /SDLF/S3/CFNBucket --profile "$PROFILE" --query "Parameter.Value")")
@@ -53,7 +53,7 @@ if ! aws s3 ls "$S3_BUCKET" --profile "$PROFILE"; then
   fi
 fi
 
-# Only when deploying a Demo of SDLF
+# Only when deploying a Demo of SDLF # TODO REREAD
 DEMO=$(sed -e 's/^"//' -e 's/"$//' <<<"$(aws ssm get-parameter --name /SDLF/Misc/Demo --profile "$PROFILE" --query "Parameter.Value")")
 if [ "$DEMO" == "true" ];then
   echo "Checking if stack exists ..."
