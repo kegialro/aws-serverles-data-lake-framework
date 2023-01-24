@@ -104,14 +104,14 @@ Resources:
       Topics:
         - !Ref rSNSTopic
 
-  rSNSTopicSubscription:
-    Type: Custom::SNSSubscription
-    Properties:
-      ServiceToken: !ImportValue sdlf-sns-topic-subscription-lambda-arn
-      TeamName: !Sub ${pTeamName}
-      TopicArn: !Ref rSNSTopic
-      SubscriptionEndpoints: !Ref pSNSNotificationsEmail
-      SubscriptionProtocol: email
+#  rSNSTopicSubscription: TODO
+#    Type: Custom::SNSSubscription
+#    Properties:
+#      ServiceToken: !ImportValue sdlf-sns-topic-subscription-lambda-arn
+#      TeamName: !Sub ${pTeamName}
+#      TopicArn: !Ref rSNSTopic
+#      SubscriptionEndpoints: !Ref pSNSNotificationsEmail
+#      SubscriptionProtocol: email
 
   ######## CODEBUILD JOBS #########
   rBuildDatasetMappings:
