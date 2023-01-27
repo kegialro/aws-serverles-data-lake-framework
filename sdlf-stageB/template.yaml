@@ -59,15 +59,15 @@ Parameters:
     Type: String
   pElasticSearchEnabled:
     Description: Boolean for wether ElasticSearch is enabled
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/ElasticSearch/Enabled
+    Type: String
+    Default: false
   pUpdateSubscriptionLambda:
     Description: ARN of the Lambda function used by the Custom Resource to update CloudWatch subscription filters
-    Type: AWS::SSM::Parameter::Value<String>
+    Type: String
     Default: /SDLF/Lambda/UpdateCloudWatchSubscriptionFilterFunctionArn
   pKibanaFunction:
     Description: ARN of the Lambda function that collates logs
-    Type: AWS::SSM::Parameter::Value<String>
+    Type: String
     Default: /SDLF/Lambda/KibanaLambdaArn
   pStatesExecutionRole:
     Type: AWS::SSM::Parameter::Value<String>
