@@ -60,6 +60,18 @@ if ! aws s3 ls "$S3_BUCKET" --profile "$PROFILE"; then
   fi
 fi
 
+BORROWED_DATASET=$(jq -r '(.[] | select(.ParameterKey=="pSharedFrom") | .ParameterValue) // "000000000000"' "$DIRNAME/parameters-$ENV".json)
+if [ "$BORROWED_DATASET" != "000000000000" ] ; then
+  echo "Dataset borrowed from AWS account $BORROWED_DATASET"
+  RAM_INVITATION=$(aws ram get-resource-share-invitations --query "resourceShareInvitations[?senderAccountId == '$BORROWED_DATASET']" --profile "$PROFILE")
+  RAM_INVITATION_STATUS=$(echo "$RAM_INVITATION" | jq -r '.[].status')
+  if [ "$RAM_INVITATION_STATUS" == "PENDING" ]; then
+    echo "Resource share invitation is pending. Accepting now..."
+    RAM_INVITATION_ARN=$(echo "$RAM_INVITATION" | jq -r '.[].resourceShareInvitationArn')
+    aws ram accept-resource-share-invitation --resource-share-invitation-arn "$RAM_INVITATION_ARN" --profile "$PROFILE"
+  fi
+fi
+
 mkdir "$DIRNAME"/output
 aws cloudformation package --profile "$PROFILE" --template-file "$DIRNAME"/template.yaml --s3-bucket "$S3_BUCKET" --s3-prefix "$TEAM_NAME/dataset/$DATASET_NAME" --output-template-file "$DIRNAME"/output/packaged-template.yaml
 

@@ -42,11 +42,29 @@ Parameters:
     Description: Name of the team owning the pipeline (all lowercase, no symbols or spaces)
     Type: String
     AllowedPattern: "[a-z0-9]*"
+  pSharedWith:
+    Description: AWS Account Id with which the dataset is shared using Lake Formation
+    Type: String
+    AllowedPattern: (\d{12}|^$)
+    ConstraintDescription: Must be an AWS account ID
+    Default: "000000000000"
+  pSharedFrom:
+    Description: AWS Account Id from which the dataset is originating
+    Type: String
+    AllowedPattern: (\d{12}|^$)
+    ConstraintDescription: Must be an AWS account ID
+    Default: "000000000000"
+
+Conditions:
+  SharedDataset: !Not [!Equals [!Ref pSharedWith, "000000000000"]]
+  BorrowedDataset: !Not [!Equals [!Ref pSharedFrom, "000000000000"]]
+  OwnedDataset: !Not  [!Condition BorrowedDataset]
 
 Resources:
   ######## GLUE #########
   rGlueDataCatalog:
     Type: AWS::Glue::Database
+    Condition: OwnedDataset
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput:
@@ -55,6 +73,7 @@ Resources:
 
   rGlueCrawler:
     Type: AWS::Glue::Crawler
+    Condition: OwnedDataset
     Properties:
       Role: !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CrawlerRoleArn:1}}"
       CrawlerSecurityConfiguration: !Sub sdlf-${pTeamName}-glue-security-config
@@ -66,6 +85,7 @@ Resources:
 
   rGlueCrawlerLakeFormationPermissions:
     Type: AWS::LakeFormation::Permissions
+    Condition: OwnedDataset
     Properties:
       DataLakePrincipal:
         DataLakePrincipalIdentifier: !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CrawlerRoleArn:1}}"
@@ -77,11 +97,36 @@ Resources:
         DatabaseResource:
           Name: !Ref rGlueDataCatalog
 
+  rSharedDatasetLakeFormationPermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: SharedDataset
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref pSharedWith
+      Permissions:
+        - DESCRIBE
+      PermissionsWithGrantOption:
+        - DESCRIBE
+      Resource:
+        DatabaseResource:
+          Name: !Ref rGlueDataCatalog
+
+  rBorrowedDatasetGlueResourceLink:
+    Type: AWS::Glue::Database
+    Condition: BorrowedDataset
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub ${pOrg}_${pApp}_${pEnvironment}_${pTeamName}_${pDatasetName}_db
+        TargetDatabase:
+          CatalogId: !Ref pSharedFrom
+          DatabaseName: !Ref pDatasetName
+
   ######## SSM #########
   rGlueDataCatalogSsm:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /SDLF/Glue/${pTeamName}/${pDatasetName}/DataCatalog
       Type: String
-      Value: !Ref rGlueDataCatalog
+      Value: !If [OwnedDataset, !Ref rGlueDataCatalog, !Ref rBorrowedDatasetGlueResourceLink]
       Description: !Sub "${pTeamName} team ${pDatasetName} metadata catalog"

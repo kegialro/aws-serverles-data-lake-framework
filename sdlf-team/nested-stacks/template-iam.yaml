@@ -594,6 +594,8 @@ Resources:
               Service: codebuild.amazonaws.com
             Action:
               - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLakeFormationCrossAccountManager
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-cicd-codebuild
           PolicyDocument:
@@ -761,6 +763,11 @@ Resources:
                   - lambda:AddPermission
                   - lambda:RemovePermission
                 Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:sdlf-${pTeamName}*
+              - Effect: Allow
+                Action:
+                  - ram:AcceptResourceShareInvitation
+                  - ram:RejectResourceShareInvitation
+                Resource: "*"
 
   rCodeBuildServiceRole:
     Type: AWS::IAM::Role
