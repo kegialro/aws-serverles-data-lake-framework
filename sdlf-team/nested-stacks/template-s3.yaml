@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: S3 and associated Lambda/SQS Resources to be created by the foundations stack
 
@@ -59,7 +59,7 @@ Resources:
     Properties:
       Bucket: !Ref rPipelineBucket
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Sid: AllowSSLRequestsOnly
             Action: s3:*
@@ -108,7 +108,7 @@ Resources:
     Properties:
       Bucket: !Ref rCentralBucket
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Sid: AllowSSLRequestsOnly
             Action: s3:*
@@ -163,7 +163,7 @@ Resources:
     Properties:
       Bucket: !Ref rRawBucket
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Sid: AllowSSLRequestsOnly
             Action: s3:*
@@ -218,7 +218,7 @@ Resources:
     Properties:
       Bucket: !Ref rStageBucket
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Sid: AllowSSLRequestsOnly
             Action: s3:*
@@ -273,7 +273,7 @@ Resources:
     Properties:
       Bucket: !Ref rAnalyticsBucket
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Sid: AllowSSLRequestsOnly
             Action: s3:*
@@ -317,7 +317,7 @@ Resources:
     Properties:
       Bucket: !Ref rAthenaBucket
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Sid: AllowSSLRequestsOnly
             Action: s3:*
@@ -467,7 +467,7 @@ Resources:
     Type: AWS::SQS::QueuePolicy
     Properties:
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -508,7 +508,7 @@ Resources:
     Type: AWS::SQS::QueuePolicy
     Properties:
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:

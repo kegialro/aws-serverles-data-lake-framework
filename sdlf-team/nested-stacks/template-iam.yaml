@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: "2010-09-09"
 Description: IAM Resources to manage a team
 
 Parameters:
@@ -43,7 +43,7 @@ Resources:
       ManagedPolicyName: !Sub sdlf-${pTeamName}-permissions-boundary
       Description: Team Permissions Boundary IAM policy. Add/remove permissions based on company policy and associate it to federated role
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Sid: AllowConsoleListBuckets
             Effect: Allow
@@ -191,7 +191,7 @@ Resources:
     Properties:
       RoleName: !Sub sdlf-${pTeamName}-codepipeline
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -203,7 +203,7 @@ Resources:
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-codepipeline
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action: iam:PassRole
@@ -490,7 +490,7 @@ Resources:
     Properties:
       RoleName: !Sub sdlf-${pTeamName}-cloudwatch-repository-trigger
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -501,7 +501,7 @@ Resources:
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-cloudwatch-repository-trigger
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -517,7 +517,7 @@ Resources:
     Properties:
       RoleName: !Sub sdlf-${pTeamName}-transform-validate
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -528,7 +528,7 @@ Resources:
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-transform-validate
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -587,7 +587,7 @@ Resources:
     Properties:
       RoleName: !Sub sdlf-${pTeamName}-cicd-codebuild
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -599,7 +599,7 @@ Resources:
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-cicd-codebuild
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action: sts:AssumeRole
@@ -774,7 +774,7 @@ Resources:
     Properties:
       RoleName: !Sub sdlf-${pTeamName}-codebuild
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -784,7 +784,7 @@ Resources:
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-codebuild
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -823,7 +823,7 @@ Resources:
     Properties:
       RoleName: !Sub sdlf-${pTeamName}-states-execution
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -839,7 +839,7 @@ Resources:
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-states-execution
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -905,12 +905,12 @@ Resources:
             Action: sts:AssumeRole
             Principal:
               Service: events.amazonaws.com
-        Version: 2012-10-17
+        Version: "2012-10-17"
       Path: /
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-trigger-lambda
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -922,7 +922,7 @@ Resources:
                 Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:sdlf-${pTeamName}-*
         - PolicyName: !Sub sdlf-${pTeamName}-describe-state-machines
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -930,7 +930,7 @@ Resources:
                 Resource: !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:*
         - PolicyName: !Sub sdlf-${pTeamName}-dataset-state-machine
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -955,7 +955,7 @@ Resources:
     Properties:
       RoleName: !Sub sdlf-${pTeamName}-codebuild-publish-layer
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -965,7 +965,7 @@ Resources:
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-codebuild-publish-layer
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action: lambda:PublishLayerVersion
@@ -1015,7 +1015,7 @@ Resources:
       RoleName: !Sub sdlf-${pTeamName}-datalake-crawler
       Path: /service-role/
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -1028,7 +1028,7 @@ Resources:
       Policies:
         - PolicyName: !Sub sdlf-${pTeamName}-glue-crawler
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:

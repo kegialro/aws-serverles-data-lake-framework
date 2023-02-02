@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: "2010-09-09"
 Description: KMS resources to manage a team
 
 Parameters:
@@ -26,7 +26,7 @@ Resources:
       Description: !Sub ${pTeamName} Infrastructure KMS Key
       EnableKeyRotation: True
       KeyPolicy:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Id: !Sub sdlf-${pTeamName}-infra-key-policy
         Statement:
           - Sid: Allow administration of the key
@@ -158,7 +158,7 @@ Resources:
       Description: !Sub ${pTeamName} Data KMS Key
       EnableKeyRotation: True
       KeyPolicy:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Id: !Sub sdlf-${pTeamName}-data-key-policy
         Statement:
           - Sid: Allow administration of the key

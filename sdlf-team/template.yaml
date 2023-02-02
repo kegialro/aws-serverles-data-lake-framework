@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: "2010-09-09"
 Description: Resources to be created by the common stack
 
 Parameters:
@@ -110,7 +110,7 @@ Resources:
     Properties:
       RoleName: sdlf-routing
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -120,7 +120,7 @@ Resources:
       Policies:
         - PolicyName: sdlf-routing
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -187,7 +187,7 @@ Resources:
       Roles:
         - sdlf-routing
       PolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Action:
