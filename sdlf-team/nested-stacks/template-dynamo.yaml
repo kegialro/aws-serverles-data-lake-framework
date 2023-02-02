@@ -465,6 +465,13 @@ Resources:
       Type: String
       Value: !Ref rDynamoOctagonObjectMetadata
       Description: Name of the DynamoDB used to store metadata
+  rDynamoObjectMetadataStreamSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /SDLF/Dynamo/ObjectCatalogStreamArn
+      Type: String
+      Value: !GetAtt rDynamoOctagonObjectMetadata.StreamArn
+      Description: Stream Arn of the ObjectMetadata DynamoDB table
   rDynamoTransformMappingSsm:
     Type: AWS::SSM::Parameter
     Properties:
@@ -486,15 +493,10 @@ Resources:
       Type: String
       Value: !Ref rDynamoOctagonManifests
       Description: Name of the DynamoDB used to store manifest process metadata
-
-Outputs:
-  oDynamoOctagonObjectMetadataStream:
-    Value: !GetAtt rDynamoOctagonObjectMetadata.StreamArn
-    Description: Stream Arn of the ObjectMetadata DynamoDB table
-    Export:
-      Name: octagon-ObjectMetadata-stream-arn
-  oDynamoOctagonSchemasStream:
-    Value: !GetAtt rDynamoOctagonSchemas.StreamArn
-    Description: Stream Arn of the DataSchemas DynamoDB table
-    Export:
-      Name: octagon-DataSchemas-stream-arn
+  rDynamoSchemasStreamSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /SDLF/Dynamo/SchemasStreamArn
+      Type: String
+      Value: !GetAtt rDynamoOctagonSchemas.StreamArn
+      Description: Stream Arn of the DataSchemas DynamoDB table

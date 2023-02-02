@@ -260,7 +260,7 @@ Resources:
                   - dynamodb:GetRecords
                   - dynamodb:GetShardIterator
                   - dynamodb:ListStreams
-                Resource: !ImportValue octagon-ObjectMetadata-stream-arn
+                Resource: "{{resolve:ssm:/SDLF/Dynamo/ObjectCatalogStreamArn}}"
             # - Effect: Allow
             #   Action:
             #   - sts:AssumeRole
@@ -403,7 +403,7 @@ Resources:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       BatchSize: 10
-      EventSourceArn: !ImportValue octagon-ObjectMetadata-stream-arn
+      EventSourceArn: "{{resolve:ssm:/SDLF/Dynamo/ObjectCatalogStreamArn}}"
       FunctionName: !GetAtt rCatalogIndexFunction.Arn
       StartingPosition: LATEST
 
