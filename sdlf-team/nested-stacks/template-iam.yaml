@@ -1107,6 +1107,27 @@ Resources:
       Type: String
       Value: !GetAtt rCodePipelineRole.Arn
       Description: The ARN of the role used by CodePipeline
+  rCodeBuildPublishLayerRoleArnSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /SDLF/IAM/${pTeamName}/CodeBuildPublishLayerRoleArn
+      Type: String
+      Value: !GetAtt rCodeBuildPublishLayerRole.Arn
+      Description: The ARN of the role used by CodeBuild to publish layers
+  rCICDCodeBuildRoleArnSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /SDLF/IAM/${pTeamName}/CICDCodeBuildRoleArn
+      Type: String
+      Value: !GetAtt rCICDCodeBuildRole.Arn
+      Description: The ARN of the CICD role used by CodeBuild
+  rCodeBuildServiceRoleArnSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /SDLF/IAM/${pTeamName}/CodeBuildServiceRoleArn
+      Type: String
+      Description: The ARN of the service role used by CodeBuild
+      Value: !GetAtt rCodeBuildServiceRole.Arn
   rCloudWatchRepositoryTriggerRoleArnSsm:
     Type: AWS::SSM::Parameter
     Properties:
@@ -1121,6 +1142,13 @@ Resources:
       Type: String
       Value: !GetAtt rStatesExecutionRole.Arn
       Description: The ARN of the States Execution role
+  rTransformValidateRoleArnSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /SDLF/IAM/${pTeamName}/TransformValidateRoleArn
+      Type: String
+      Value: !GetAtt rTransformValidateRole.Arn
+      Description: The ARN of the Transform Validation role
   rDatalakeCrawlerRoleArnSsm:
     Type: AWS::SSM::Parameter
     Properties:

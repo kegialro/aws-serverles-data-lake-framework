@@ -167,17 +167,12 @@ Resources:
 
   ######## KMS #########
   rKMSStack:
-    Type: AWS::CloudFormation::Stack
+    Type: awslabs::sdlf::teamkms::MODULE
     Properties:
-      TemplateURL: ./nested-stacks/template-kms.yaml
-      Parameters:
-        pEnvironment: !Ref pEnvironment
-        pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-        pTeamName: !Ref pTeamName
-        pRoleLambdaExecutionArn: !If [DefaultTeam, !GetAtt rRoleLambdaExecution.Arn, "{{resolve:ssm:/SDLF/Misc/rRoleLambdaExecution:1}}"]
-      Tags:
-        - Key: tagging-policy
-          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-${pTeamName}
+      pEnvironment: !Ref pEnvironment
+      pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
+      pTeamName: !Ref pTeamName
+      pRoleLambdaExecutionArn: !If [DefaultTeam, !GetAtt rRoleLambdaExecution.Arn, "{{resolve:ssm:/SDLF/Misc/rRoleLambdaExecution:1}}"]
 
   rRoleLambdaExecutionPolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -197,119 +192,94 @@ Resources:
               - kms:Encrypt
               - kms:GenerateDataKey*
               - kms:ReEncrypt*
-            Resource: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
+            Resource: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
 
   ######## S3 #########
   rS3Stack:
-    Type: AWS::CloudFormation::Stack
+    Type: awslabs::sdlf::teams3::MODULE
     Condition: DefaultTeam
     Properties:
-      TemplateURL: ./nested-stacks/template-s3.yaml
-      Parameters:
-        pApplicationName: !Ref pApplicationName
-        pCustomBucketPrefix: !Ref pCustomBucketPrefix
-        pEnvironment: !Ref pEnvironment
-        pKMSInfraKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
-        pKMSDataKeyId: !GetAtt [rKMSStack, Outputs.oKMSDataKeyId]
-        pNumBuckets: !Ref pNumBuckets
-        pOrganizationName: !Ref pOrganizationName
-        pCloudWatchLogsRetentionInDays: !Ref pCloudWatchLogsRetentionInDays
-        pRoleLambdaExecutionArn: !GetAtt rRoleLambdaExecution.Arn
-      Tags:
-        - Key: tagging-policy
-          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+      pApplicationName: !Ref pApplicationName
+      pCustomBucketPrefix: !Ref pCustomBucketPrefix
+      pEnvironment: !Ref pEnvironment
+      pKMSInfraKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
+      pKMSDataKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/DataKeyId}}"
+      pNumBuckets: !Ref pNumBuckets
+      pOrganizationName: !Ref pOrganizationName
+      pCloudWatchLogsRetentionInDays: !Ref pCloudWatchLogsRetentionInDays
+      pRoleLambdaExecutionArn: !GetAtt rRoleLambdaExecution.Arn
 
   ######## DYNAMODB #########
   rDynamoStack:
-    Type: AWS::CloudFormation::Stack
+    Type: awslabs::sdlf::teamdynamo::MODULE
     Condition: DefaultTeam
     DependsOn: rS3Stack
     Properties:
-      TemplateURL: ./nested-stacks/template-dynamo.yaml
-      Parameters:
-        pEnvironment: !Ref pEnvironment
-        pKMSKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
-      Tags:
-        - Key: tagging-policy
-          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+      pEnvironment: !Ref pEnvironment
+      pKMSKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
 
   ######## GLUE REPLICATION #########
   rGlueReplicationStack:
-    Type: AWS::CloudFormation::Stack
+    Type: awslabs::sdlf::teamglue::MODULE
     Condition: DefaultTeam
     DependsOn: rDynamoStack
     Properties:
-      TemplateURL: ./nested-stacks/template-glue.yaml
-      Parameters:
-        pDataLakeAdminRoleArn: !Ref pDataLakeAdminRoleArn
-        pEnvironment: !Ref pEnvironment
-        pKMSKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
-        pCloudWatchLogsRetentionInDays: !Ref pCloudWatchLogsRetentionInDays
-      Tags:
-        - Key: tagging-policy
-          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-foundations
+      pDataLakeAdminRoleArn: !Ref pDataLakeAdminRoleArn
+      pEnvironment: !Ref pEnvironment
+      pKMSKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
+      pCloudWatchLogsRetentionInDays: !Ref pCloudWatchLogsRetentionInDays
 
   ######## IAM #########
   rIAMStack:
-    Type: AWS::CloudFormation::Stack
+    Type: awslabs::sdlf::teamiam::MODULE
     Properties:
-      TemplateURL: ./nested-stacks/template-iam.yaml
-      Parameters:
-        pAnalyticsBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oAnalyticsBucket], "{{resolve:ssm:/SDLF/S3/AnalyticsBucket:1}}"]
-        pApplicationName: !Ref pApplicationName
-        pCentralBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oCentralBucket], "{{resolve:ssm:/SDLF/S3/CentralBucket:1}}"]
-        pCFNBucket: !Ref pCFNBucket
-        pEnvironment: !Ref pEnvironment
-        pKMSInfraKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
-        pKMSDataKeyId: !GetAtt [rKMSStack, Outputs.oKMSDataKeyId]
-        pOrganizationName: !Ref pOrganizationName
-        pPipelineBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oPipelineBucket], "{{resolve:ssm:/SDLF/S3/ArtifactsBucket:1}}"]
-        pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-        pStageBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oStageBucket], "{{resolve:ssm:/SDLF/S3/StageBucket:1}}"]
-        pTeamName: !Ref pTeamName
-      Tags:
-        - Key: tagging-policy
-          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-${pTeamName}
+      pAnalyticsBucket: "{{resolve:ssm:/SDLF/S3/AnalyticsBucket}}"
+      pApplicationName: !Ref pApplicationName
+      pCentralBucket: "{{resolve:ssm:/SDLF/S3/CentralBucket}}"
+      pCFNBucket: !Ref pCFNBucket
+      pEnvironment: !Ref pEnvironment
+      pKMSInfraKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
+      pKMSDataKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/DataKeyId}}"
+      pOrganizationName: !Ref pOrganizationName
+      pPipelineBucket: "{{resolve:ssm:/SDLF/S3/ArtifactsBucket}}"
+      pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
+      pStageBucket: "{{resolve:ssm:/SDLF/S3/StageBucket}}"
+      pTeamName: !Ref pTeamName
 
   ######## CICD #########
   rCICDStack:
-    Type: AWS::CloudFormation::Stack
+    Type: awslabs::sdlf::teamcicd::MODULE
     Properties:
-      TemplateURL: ./nested-stacks/template-cicd.yaml
-      Parameters:
-        pAnalyticsBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oAnalyticsBucket], "{{resolve:ssm:/SDLF/S3/AnalyticsBucket:1}}"]
-        pApplicationName: !Ref pApplicationName
-        pCentralBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oCentralBucket], "{{resolve:ssm:/SDLF/S3/CentralBucket:1}}"]
-        pCFNBucket: !Ref pCFNBucket
-        pCloudWatchRepositoryTriggerRoleArn:
-          !GetAtt [rIAMStack, Outputs.oCloudWatchRepositoryTriggerRoleArn]
-        pCodeBuildPublishLayerRoleArn:
-          !GetAtt [rIAMStack, Outputs.oCodeBuildPublishLayerRoleArn]
-        pCICDCodeBuildRoleArn:
-          !GetAtt [rIAMStack, Outputs.oCICDCodeBuildRoleArn]
-        pCodeBuildServiceRoleArn:
-          !GetAtt [rIAMStack, Outputs.oCodeBuildServiceRoleArn]
-        pCodePipelineRoleArn: !GetAtt [rIAMStack, Outputs.oCodePipelineRoleArn]
-        pDatalakeLibraryRepositoryName: !Ref pDatalakeLibraryRepositoryName
-        pDatalakeLibsLambdaLayerName: !Ref pDatalakeLibsLambdaLayerName
-        pDefaultPipLibrariesLambdaLayerName: !Ref pDefaultPipLibrariesLambdaLayerName
-        pEnvironment: !Ref pEnvironment
-        pKMSInfraKeyId: !GetAtt [rKMSStack, Outputs.oKMSInfraKeyId]
-        pLibrariesBranchName: !Ref pLibrariesBranchName
-        pMinimumTestCoverage: !Ref pMinTestCoverage
-        pOrganizationName: !Ref pOrganizationName
-        pPipelineBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oPipelineBucket], "{{resolve:ssm:/SDLF/S3/ArtifactsBucket:1}}"]
-        pPipLibrariesRepositoryName: !Ref pPipLibrariesRepositoryName
-        pRunCodeCoverage: !Ref pRunCodeCoverage
-        pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-        pStageBucket: !If [DefaultTeam, !GetAtt [rS3Stack, Outputs.oStageBucket], "{{resolve:ssm:/SDLF/S3/StageBucket:1}}"]
-        pSNSNotificationsEmail: !Ref pSNSNotificationsEmail
-        pTeamName: !Ref pTeamName
-        pTransformValidateRoleArn:
-          !GetAtt [rIAMStack, Outputs.oTransformValidateRoleArn]
-      Tags:
-        - Key: tagging-policy
-          Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-${pTeamName}
+      pAnalyticsBucket: "{{resolve:ssm:/SDLF/S3/AnalyticsBucket}}"
+      pApplicationName: !Ref pApplicationName
+      pCentralBucket: "{{resolve:ssm:/SDLF/S3/CentralBucket}}"
+      pCFNBucket: !Ref pCFNBucket
+      pCloudWatchRepositoryTriggerRoleArn:
+        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CloudWatchRepositoryTriggerRoleArn}}"
+      pCodeBuildPublishLayerRoleArn:
+        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CodeBuildPublishLayerRoleArn}}"
+      pCICDCodeBuildRoleArn:
+        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CICDCodeBuildRoleArn}}"
+      pCodeBuildServiceRoleArn:
+        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CodeBuildServiceRoleArn}}"
+      pCodePipelineRoleArn: !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CodePipelineRoleArn}}"
+      pDatalakeLibraryRepositoryName: !Ref pDatalakeLibraryRepositoryName
+      pDatalakeLibsLambdaLayerName: !Ref pDatalakeLibsLambdaLayerName
+      pDefaultPipLibrariesLambdaLayerName: !Ref pDefaultPipLibrariesLambdaLayerName
+      pEnvironment: !Ref pEnvironment
+      pKMSInfraKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
+      pLibrariesBranchName: !Ref pLibrariesBranchName
+      pMinimumTestCoverage: !Ref pMinTestCoverage
+      pOrganizationName: !Ref pOrganizationName
+      pPipelineBucket: "{{resolve:ssm:/SDLF/S3/ArtifactsBucket}}"
+      pPipLibrariesRepositoryName: !Ref pPipLibrariesRepositoryName
+      pRunCodeCoverage: !Ref pRunCodeCoverage
+      pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
+      pStageBucket: "{{resolve:ssm:/SDLF/S3/StageBucket}}"
+      pSNSNotificationsEmail: !Ref pSNSNotificationsEmail
+      pTeamName: !Ref pTeamName
+      pTransformValidateRoleArn:
+        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/TransformValidateRoleArn}}"
 
   ######## SSM OUTPUTS #########
   rOrganizationSsm:
