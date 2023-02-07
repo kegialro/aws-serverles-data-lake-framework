@@ -234,26 +234,26 @@ Resources:
   rIAMStack:
     Type: awslabs::sdlf::teamiam::MODULE
     Properties:
-      pAnalyticsBucket: !Ref rS3StackrAnalyticsBucket
+      pAnalyticsBucket: !If [DefaultTeam, !Ref rS3StackrAnalyticsBucket, "{{resolve:ssm:/SDLF/S3/AnalyticsBucket}}"]
       pApplicationName: !Ref pApplicationName
-      pCentralBucket: !Ref rS3StackrRawBucket
+      pCentralBucket: !If [DefaultTeam, !Ref rS3StackrRawBucket, "{{resolve:ssm:/SDLF/S3/CentralBucket}}"]
       pCFNBucket: !Ref pCFNBucket
       pEnvironment: !Ref pEnvironment
       pKMSInfraKeyId: !GetAtt rKMSStackrKMSInfraKey.Arn
       pKMSDataKeyId: !GetAtt rKMSStackrKMSDataKey.Arn
       pOrganizationName: !Ref pOrganizationName
-      pPipelineBucket: !Ref rS3StackrArtifactsBucket
+      pPipelineBucket: !If [DefaultTeam, !Ref rS3StackrArtifactsBucket, "{{resolve:ssm:/SDLF/S3/ArtifactsBucket}}"]
       pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-      pStageBucket: !Ref rS3StackrStageBucket
+      pStageBucket: !If [DefaultTeam, !Ref rS3StackrStageBucket, "{{resolve:ssm:/SDLF/S3/StageBucket}}"]
       pTeamName: !Ref pTeamName
 
   ######## CICD #########
   rCICDStack:
     Type: awslabs::sdlf::teamcicd::MODULE
     Properties:
-      pAnalyticsBucket: !Ref rS3StackrAnalyticsBucket
+      pAnalyticsBucket: !If [DefaultTeam, !Ref rS3StackrAnalyticsBucket, "{{resolve:ssm:/SDLF/S3/AnalyticsBucket}}"]
       pApplicationName: !Ref pApplicationName
-      pCentralBucket: !Ref rS3StackrRawBucket
+      pCentralBucket: !If [DefaultTeam, !Ref rS3StackrRawBucket, "{{resolve:ssm:/SDLF/S3/CentralBucket}}"]
       pCFNBucket: !Ref pCFNBucket
       pCloudWatchRepositoryTriggerRoleArn: !GetAtt rIAMStackrCodeBuildPublishLayerRole.Arn
       pCodeBuildPublishLayerRoleArn: !GetAtt rIAMStackrCodeBuildPublishLayerRole.Arn
@@ -268,11 +268,11 @@ Resources:
       pLibrariesBranchName: !Ref pLibrariesBranchName
       pMinimumTestCoverage: !Ref pMinTestCoverage
       pOrganizationName: !Ref pOrganizationName
-      pPipelineBucket: !Ref rS3StackrArtifactsBucket
+      pPipelineBucket: !If [DefaultTeam, !Ref rS3StackArtifactsBucket, "{{resolve:ssm:/SDLF/S3/ArtifactsBucket}}"]
       pPipLibrariesRepositoryName: !Ref pPipLibrariesRepositoryName
       pRunCodeCoverage: !Ref pRunCodeCoverage
       pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-      pStageBucket: !Ref rS3StackrStageBucket
+      pStageBucket: !If [DefaultTeam, !Ref rS3StackrStageBucket, "{{resolve:ssm:/SDLF/S3/StageBucket}}"]
       pSNSNotificationsEmail: !Ref pSNSNotificationsEmail
       pTeamName: !Ref pTeamName
       pTransformValidateRoleArn: !GetAtt rIAMStackrTransformValidateRole.Arn
