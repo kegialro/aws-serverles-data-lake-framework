@@ -192,18 +192,19 @@ Resources:
               - kms:Encrypt
               - kms:GenerateDataKey*
               - kms:ReEncrypt*
-            Resource: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
+            Resource: !GetAtt rKMSStackrKMSInfraKey.Arn
 
   ######## S3 #########
   rS3Stack:
     Type: awslabs::sdlf::teams3::MODULE
     Condition: DefaultTeam
+    DependsOn: rKMSStack
     Properties:
       pApplicationName: !Ref pApplicationName
       pCustomBucketPrefix: !Ref pCustomBucketPrefix
       pEnvironment: !Ref pEnvironment
-      pKMSInfraKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
-      pKMSDataKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/DataKeyId}}"
+      pKMSInfraKeyId: !GetAtt rKMSStackrKMSInfraKey.Arn
+      pKMSDataKeyId: !GetAtt rKMSStackrKMSDataKey.Arn
       pNumBuckets: !Ref pNumBuckets
       pOrganizationName: !Ref pOrganizationName
       pCloudWatchLogsRetentionInDays: !Ref pCloudWatchLogsRetentionInDays
@@ -216,7 +217,7 @@ Resources:
     DependsOn: rS3Stack
     Properties:
       pEnvironment: !Ref pEnvironment
-      pKMSKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
+      pKMSKeyId: !GetAtt rKMSStackrKMSInfraKey.Arn
 
   ######## GLUE REPLICATION #########
   rGlueReplicationStack:
@@ -226,60 +227,55 @@ Resources:
     Properties:
       pDataLakeAdminRoleArn: !Ref pDataLakeAdminRoleArn
       pEnvironment: !Ref pEnvironment
-      pKMSKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
+      pKMSKeyId: !GetAtt rKMSStackrKMSInfraKey.Arn
       pCloudWatchLogsRetentionInDays: !Ref pCloudWatchLogsRetentionInDays
 
   ######## IAM #########
   rIAMStack:
     Type: awslabs::sdlf::teamiam::MODULE
     Properties:
-      pAnalyticsBucket: "{{resolve:ssm:/SDLF/S3/AnalyticsBucket}}"
+      pAnalyticsBucket: !Ref rS3StackrAnalyticsBucket
       pApplicationName: !Ref pApplicationName
-      pCentralBucket: "{{resolve:ssm:/SDLF/S3/CentralBucket}}"
+      pCentralBucket: !Ref rS3StackrRawBucket
       pCFNBucket: !Ref pCFNBucket
       pEnvironment: !Ref pEnvironment
-      pKMSInfraKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
-      pKMSDataKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/DataKeyId}}"
+      pKMSInfraKeyId: !GetAtt rKMSStackrKMSInfraKey.Arn
+      pKMSDataKeyId: !GetAtt rKMSStackrKMSDataKey.Arn
       pOrganizationName: !Ref pOrganizationName
-      pPipelineBucket: "{{resolve:ssm:/SDLF/S3/ArtifactsBucket}}"
+      pPipelineBucket: !Ref rS3StackrArtifactsBucket
       pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-      pStageBucket: "{{resolve:ssm:/SDLF/S3/StageBucket}}"
+      pStageBucket: !Ref rS3StackrStageBucket
       pTeamName: !Ref pTeamName
 
   ######## CICD #########
   rCICDStack:
     Type: awslabs::sdlf::teamcicd::MODULE
     Properties:
-      pAnalyticsBucket: "{{resolve:ssm:/SDLF/S3/AnalyticsBucket}}"
+      pAnalyticsBucket: !Ref rS3StackrAnalyticsBucket
       pApplicationName: !Ref pApplicationName
-      pCentralBucket: "{{resolve:ssm:/SDLF/S3/CentralBucket}}"
+      pCentralBucket: !Ref rS3StackrRawBucket
       pCFNBucket: !Ref pCFNBucket
-      pCloudWatchRepositoryTriggerRoleArn:
-        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CloudWatchRepositoryTriggerRoleArn}}"
-      pCodeBuildPublishLayerRoleArn:
-        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CodeBuildPublishLayerRoleArn}}"
-      pCICDCodeBuildRoleArn:
-        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CICDCodeBuildRoleArn}}"
-      pCodeBuildServiceRoleArn:
-        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CodeBuildServiceRoleArn}}"
-      pCodePipelineRoleArn: !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/CodePipelineRoleArn}}"
+      pCloudWatchRepositoryTriggerRoleArn: !GetAtt rIAMStackrCodeBuildPublishLayerRole.Arn
+      pCodeBuildPublishLayerRoleArn: !GetAtt rIAMStackrCodeBuildPublishLayerRole.Arn
+      pCICDCodeBuildRoleArn: !GetAtt rIAMStackrCICDCodeBuildRole.Arn
+      pCodeBuildServiceRoleArn: !GetAtt rIAMStackrCodeBuildServiceRole.Arn
+      pCodePipelineRoleArn: !GetAtt rIAMStackrCodePipelineRole.Arn
       pDatalakeLibraryRepositoryName: !Ref pDatalakeLibraryRepositoryName
       pDatalakeLibsLambdaLayerName: !Ref pDatalakeLibsLambdaLayerName
       pDefaultPipLibrariesLambdaLayerName: !Ref pDefaultPipLibrariesLambdaLayerName
       pEnvironment: !Ref pEnvironment
-      pKMSInfraKeyId: !Sub "{{resolve:ssm:/SDLF/KMS/${pTeamName}/InfraKeyId}}"
+      pKMSInfraKeyId: !GetAtt rKMSStackrKMSInfraKey.Arn
       pLibrariesBranchName: !Ref pLibrariesBranchName
       pMinimumTestCoverage: !Ref pMinTestCoverage
       pOrganizationName: !Ref pOrganizationName
-      pPipelineBucket: "{{resolve:ssm:/SDLF/S3/ArtifactsBucket}}"
+      pPipelineBucket: !Ref rS3StackrArtifactsBucket
       pPipLibrariesRepositoryName: !Ref pPipLibrariesRepositoryName
       pRunCodeCoverage: !Ref pRunCodeCoverage
       pSharedDevOpsAccountId: !Ref pSharedDevOpsAccountId
-      pStageBucket: "{{resolve:ssm:/SDLF/S3/StageBucket}}"
+      pStageBucket: !Ref rS3StackrStageBucket
       pSNSNotificationsEmail: !Ref pSNSNotificationsEmail
       pTeamName: !Ref pTeamName
-      pTransformValidateRoleArn:
-        !Sub "{{resolve:ssm:/SDLF/IAM/${pTeamName}/TransformValidateRoleArn}}"
+      pTransformValidateRoleArn: !GetAtt rIAMStackrTransformValidateRole.Arn
 
   ######## SSM OUTPUTS #########
   rOrganizationSsm:
