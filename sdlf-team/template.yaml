@@ -18,6 +18,10 @@ Parameters:
     Description: The CloudFormation bucket for the solution
     Type: AWS::SSM::Parameter::Value<String>
     Default: /SDLF/S3/CFNBucket
+  pAthenaBucket:
+    Description: S3 Athena bucket
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /SDLF/S3/AthenaBucket
   pDataQualityStateMachine:
     Description: The data quality state machine
     Type: AWS::SSM::Parameter::Value<String>
@@ -156,3 +160,30 @@ Resources:
       Tags:
         - Key: tagging-policy
           Value: !Sub ${pOrganizationName}-${pApplicationName}-${pEnvironment}-${pTeamName}
+
+
+  rAthenaWorkgroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Description: !Sub Athena workgroup for team ${pTeamName}
+      Name: !Sub sdlf-${pTeamName}
+      State: ENABLED
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        EngineVersion:
+          SelectedEngineVersion: Athena engine version 3
+          EffectiveEngineVersion: Athena engine version 3
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
+            KmsKey: !GetAtt [rKMSStack, Outputs.oKMSDataKeyId]
+          OutputLocation: !Sub s3://${pAthenaBucket}/${pTeamName}
+
+  rAthenaWorkgroupSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /SDLF/Athena/${pTeamName}/WorkgroupName
+      Type: String
+      Value: !Ref rAthenaWorkgroup
+      Description: The name of the Athena workgroup
