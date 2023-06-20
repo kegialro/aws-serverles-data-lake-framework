@@ -83,7 +83,6 @@ Resources:
         pAppName: !Ref pApplicationName
         pArtifactoryStore: !Ref pCFNBucket
         pBranchName: !Ref pStageABranch
-        pBuildDatalakeLibrary: !Sub /SDLF/CodeBuild/${pTeamName}/BuildDeployDatalakeLibraryLayer
         pCloudWatchRepositoryTriggerRoleArn: !Sub /SDLF/IAM/${pTeamName}/CloudWatchRepositoryTriggerRoleArn
         pCodePipelineRoleArn: !Sub /SDLF/IAM/${pTeamName}/CodePipelineRoleArn
         pDatasetBucket: !Ref pCentralBucket
@@ -117,7 +116,6 @@ Resources:
         pAppName: !Ref pApplicationName
         pArtifactoryStore: !Ref pCFNBucket
         pBranchName: !Ref pStageBBranch
-        pBuildDatalakeLibrary: !Sub /SDLF/CodeBuild/${pTeamName}/BuildDeployDatalakeLibraryLayer
         pCloudWatchRepositoryTriggerRoleArn: !Sub /SDLF/IAM/${pTeamName}/CloudWatchRepositoryTriggerRoleArn
         pCodePipelineRoleArn: !Sub /SDLF/IAM/${pTeamName}/CodePipelineRoleArn
         pDatasetBucket: !Ref pStageBucket

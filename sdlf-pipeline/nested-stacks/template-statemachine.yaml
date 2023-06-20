@@ -19,8 +19,6 @@ Parameters:
     Type: String
   pBranchName:
     Type: String
-  pBuildDatalakeLibrary:
-    Type: AWS::SSM::Parameter::Value<String>
   pCloudWatchRepositoryTriggerRoleArn:
     Type: AWS::SSM::Parameter::Value<String>
   pCodePipelineRoleArn:
@@ -160,25 +158,6 @@ Resources:
       Targets:
         - Arn: !Sub arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${rStateMachinePipeline}
           Id: !Sub sdlf-${pTeamName}-${pPipeline}-${pRepositoryName}-trigger
-          RoleArn: !Ref pCloudWatchRepositoryTriggerRoleArn
-
-  rPipelineTriggerOnLayerUpdate:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: !Sub "Update ${pTeamName} ${pPipeline} Pipeline on layer update"
-      EventPattern:
-        source:
-          - aws.codebuild
-        detail-type:
-          - CodeBuild Build State Change
-        detail:
-          build-status:
-            - SUCCEEDED
-          project-name:
-            - !Ref pBuildDatalakeLibrary
-      Targets:
-        - Arn: !Sub arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${rStateMachinePipeline}
-          Id: !Sub sdlf-${pTeamName}-${pPipeline}-${pRepositoryName}-update
           RoleArn: !Ref pCloudWatchRepositoryTriggerRoleArn
 
   rPipelineFailedRule:

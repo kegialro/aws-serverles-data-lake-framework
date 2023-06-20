@@ -431,6 +431,119 @@ Resources:
               - "**/*"
 
   ######## LAMBDA LAYER PIPELINE #########
+  rLambdaUpdateTeamLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+        Version: 2012-10-17
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+                Sid: LogAccessPolicy
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/SDLF/Lambda/${pTeamName}/LatestDatalakeLibraryLayer
+              - Action:
+                  - lambda:ListFunctions
+                Effect: Allow
+                Resource:
+                  - "*"
+              - Action:
+                  - lambda:GetFunctionConfiguration
+                  - lambda:UpdateFunctionConfiguration
+                Effect: Allow
+                Resource:
+                  - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:sdlf-${pTeamName}-*
+              - Action:
+                  - lambda:GetLayerVersion
+                Effect: Allow
+                Resource:
+                  - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:layer:sdlf-${pTeamName}-*
+              - Effect: Allow
+                Action:
+                  - codepipeline:PutJobSuccessResult
+                  - codepipeline:PutJobFailureResult
+                Resource: "*"
+
+  rLambdaUpdateTeamLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Update all Lambda functions owned by a team to use the latest version of the Datalake Library layer - if they use it
+      FunctionName: !Sub sdlf-${pTeamName}-update-team-lambda
+      Handler: index.lambda_handler
+      MemorySize: 256
+      Role: !GetAtt rLambdaUpdateTeamLambdaRole.Arn
+      Runtime: python3.9
+      Timeout: 300
+      Environment:
+        Variables:
+          TEAM_NAME: !Ref pTeamName
+      Code:
+        ZipFile: |
+          import logging
+          import os
+          import boto3
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          lam = boto3.client('lambda')
+          ssm = boto3.client('ssm')
+          codepipeline = boto3.client('codepipeline')
+
+          def lambda_handler(event, context):
+              try:
+                  datalake_lib_layer_latest = ssm.get_parameter(Name=f"/SDLF/Lambda/{os.environ['TEAM_NAME']}/LatestDatalakeLibraryLayer")['Parameter']['Value']
+                  datalake_lib_layer_base = ':'.join(datalake_lib_layer_latest.split(':')[:-1])
+
+                  functions = lam.list_functions()
+
+                  while True:
+                      for function in functions['Functions']:
+                          if function['FunctionName'].startswith(f"sdlf-{os.environ['TEAM_NAME']}-"):
+                              function_configuration = lam.get_function_configuration(FunctionName=function['FunctionArn'])
+                              if 'Layers' in function_configuration:
+                                  for function_layer in function_configuration['Layers']:
+                                      if function_layer['Arn'].startswith(datalake_lib_layer_base):
+                                          lam.update_function_configuration(
+                                              FunctionName=function['FunctionArn'],
+                                              Layers=[
+                                                  datalake_lib_layer_latest
+                                              ]
+                                          )
+                                          break
+                      if 'NextMarker' in functions:
+                          functions = lam.list_functions(Marker=functions['NextMarker'])
+                      else:
+                          break
+              except Exception as e:
+                  message = "Function exception: " + str(e)
+                  codepipeline.put_job_failure_result(jobId=event["CodePipeline.job"]["id"], failureDetails={"message": message, "type": "JobFailed"})
+                  raise
+
+              codepipeline.put_job_success_result(jobId=event["CodePipeline.job"]["id"])
+              return "Success"
+
   rCommonDatalakeLibs:
     Type: AWS::CodePipeline::Pipeline
     Condition: NotRunUnitTestingStage
@@ -482,6 +595,19 @@ Resources:
               Configuration:
                 ProjectName: !Ref rBuildDeployDatalakeLibraryLayer
               RunOrder: 2
+        - Name: UpdateTeamLambdaFunctions
+          Actions:
+            - Name: Deploy
+              InputArtifacts:
+                - Name: DatalakeRepositoryArtifact
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Version: "1"
+                Provider: Lambda
+              Configuration:
+                FunctionName: !Ref rLambdaUpdateTeamLambda
+              RunOrder: 1
       ArtifactStore:
         Type: S3
         EncryptionKey:
