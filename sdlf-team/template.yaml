@@ -214,6 +214,11 @@ Resources:
           RoleArn: !GetAtt rEventBusForwardingRole.Arn
           Id: !Sub sdlf-${pTeamName}-eventbus
 
+  rScheduleGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: !Sub sdlf-${pTeamName}
+
   rGlueSecurityConfiguration:
     Type: AWS::Glue::SecurityConfiguration
     Properties:
@@ -278,6 +283,13 @@ Resources:
       Type: String
       Value: !GetAtt rEventBus.Arn
       Description: !Sub Arn of the ${pTeamName} event bus
+  rScheduleGroupSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /SDLF/EventBridge/${pTeamName}/ScheduleGroupName
+      Type: String
+      Value: !Ref rScheduleGroup
+      Description: !Sub Name of the ${pTeamName} schedule group
   #### END KMS STACK
 
   ######## IAM #########
@@ -429,6 +441,11 @@ Resources:
               - cloudformation:DescribeStackResources
             Resource:
               - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack:sdlf-${pTeamName}:*
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:sdlf-${pTeamName}-*
 
   rStatesExecutionRole:
     Type: AWS::IAM::Role
@@ -1315,6 +1332,7 @@ Resources:
               - states:ListActivities
               - states:ListStateMachines
               - states:TagResource
+              - states:UntagResource
             Resource: !Sub arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:*
           - Effect: Allow
             Action:
