@@ -177,6 +177,43 @@ Resources:
       AliasName: !Sub alias/sdlf-${pTeamName}-kms-data-key
       TargetKeyId: !Ref rKMSDataKey
 
+  rEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: !Sub sdlf-${pTeamName}
+
+  rEventBusForwardingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: events.amazonaws.com
+      Policies:
+        - PolicyName: !Sub sdlf-team-eventbus
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - events:PutEvents
+                Resource: !GetAtt rEventBus.Arn
+
+  rEventBusForwarding:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Forward all events from the default eventbus to the team's"
+      EventPattern:
+        account:
+          - !Ref AWS::AccountId
+      Targets:
+        - Arn: !GetAtt rEventBus.Arn
+          RoleArn: !GetAtt rEventBusForwardingRole.Arn
+          Id: !Sub sdlf-${pTeamName}-eventbus
+
   rGlueSecurityConfiguration:
     Type: AWS::Glue::SecurityConfiguration
     Properties:
@@ -234,7 +271,13 @@ Resources:
       Type: String
       Value: !GetAtt rKMSDataKey.Arn
       Description: !Sub Arn of the ${pTeamName} KMS data key
-
+  rEventBusSsm:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /SDLF/EventBridge/${pTeamName}/EventBusArn
+      Type: String
+      Value: !GetAtt rEventBus.Arn
+      Description: !Sub Arn of the ${pTeamName} event bus
   #### END KMS STACK
 
   ######## IAM #########
@@ -808,6 +851,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Description: "Run Datasets DynamoDB update"
+      EventBusName: !GetAtt rEventBus.Arn
       EventPattern:
         source:
           - aws.cloudformation
@@ -993,6 +1037,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Description: "Run Pipelines DynamoDB update"
+      EventBusName: !GetAtt rEventBus.Arn
       EventPattern:
         source:
           - aws.cloudformation
@@ -1139,7 +1184,7 @@ Resources:
               - events:PutRule
               - events:PutTargets
               - events:RemoveTargets
-            Resource: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:rule/sdlf-${pTeamName}-*
+            Resource: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:rule/sdlf-${pTeamName}/sdlf-${pTeamName}-*
           - Effect: Allow
             Action:
               - kms:CreateGrant

@@ -15,6 +15,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 events = boto3.client("events", config=session_config)
 dynamodb = boto3.resource("dynamodb", config=session_config)
+ssm = boto3.client("ssm", config=session_config)
 dataset_table = dynamodb.Table("octagon-Datasets-{}".format(os.environ["ENV"]))
 pipeline_table = dynamodb.Table("octagon-Pipelines-{}".format(os.environ["ENV"]))
 
@@ -57,13 +58,15 @@ def get_item(table, team, dataset):
     else:
         item = response["Item"]
         for key in item["pipeline"]:
-            return key # there is only one element currently
+            return key  # there is only one element currently
+
 
 def get_pipeline_entrypoint(table, team, pipeline):
     query = paginate_dynamodb_response(
         table.query,
         IndexName="entrypoint-name-index",
-        KeyConditionExpression=Key("entrypoint").eq("true") & Key("name").begins_with("{}-{}-".format(team, pipeline)),
+        KeyConditionExpression=Key("entrypoint").eq("true")
+        & Key("name").begins_with("{}-{}-".format(team, pipeline)),
     )
 
     for row in query:
@@ -99,12 +102,21 @@ def lambda_handler(event, context):
             logger.info("Sending events to default event bus for processing")
             entries = events.put_events(
                 Entries=[
-                    {"Source": "sdlf.s3", "DetailType": "SdlfObjectInS3", "Detail": json.dumps(message)},
-                ]
+                    {
+                        "Source": "sdlf.s3",
+                        "DetailType": "SdlfObjectInS3",
+                        "Detail": json.dumps(message),
+                        "EventBusName": ssm.get_parameter(
+                            Name=f"/SDLF/EventBridge/{team}/EventBusArn"
+                        )["Parameter"]["Value"],
+                    },
+                ],
             )
 
             if entries["FailedEntryCount"] > 0:
-                raise Exception("Some entries could not be sent to EventBridge: {}".format(entries))
+                raise Exception(
+                    "Some entries could not be sent to EventBridge: {}".format(entries)
+                )
     except Exception as e:
         logger.error("Fatal error", exc_info=True)
         raise e

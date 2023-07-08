@@ -73,6 +73,11 @@ Resources:
           - Send events to ${pStageName} queue
           - pStageName:
               Ref: pStageName
+      EventBusName:
+        Fn::Sub:
+          - "{{resolve:ssm:/SDLF/EventBridge/${pTeamName}/EventBusArn}}"
+          - pTeamName:
+              Ref: pTeamName
       EventPattern:
         Ref: pEventPattern
       State: ENABLED
@@ -197,6 +202,11 @@ Resources:
           - Trigger ${pStageName} Routing Lambda on a specified schedule
           - pStageName:
               Ref: pStageName
+      EventBusName:
+        Fn::Sub:
+          - "{{resolve:ssm:/SDLF/EventBridge/${pTeamName}/EventBusArn}}"
+          - pTeamName:
+              Ref: pTeamName
       State: ENABLED
       ScheduleExpression:
         Ref: pSchedule

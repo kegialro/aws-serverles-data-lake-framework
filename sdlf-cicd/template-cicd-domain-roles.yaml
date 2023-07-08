@@ -726,6 +726,13 @@ Resources:
                   - codepipeline:GetPipelineState
                   - codepipeline:GetPipeline
                   - codepipeline:UpdatePipeline
+              - Resource: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/sdlf-*
+                Effect: Allow
+                Action:
+                  - events:CreateEventBus
+                  - events:DeleteEventBus
+                  - events:DescribeEventBus
+                  - events:TagResource
               - Resource: !Sub arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:*
                 Effect: Allow
                 Action: sqs:ListQueues
