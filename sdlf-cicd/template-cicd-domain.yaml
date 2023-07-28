@@ -13,12 +13,6 @@ Parameters:
   pCicdRepository:
     Type: AWS::SSM::Parameter::Value<String>
     Default: /SDLF/CodeCommit/CicdCodeCommit
-  pFoundationsRepository:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/CodeCommit/FoundationsCodeCommit
-  pTeamRepository:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /SDLF/CodeCommit/TeamCodeCommit
   pPipelineRepository:
     Type: AWS::SSM::Parameter::Value<String>
     Default: /SDLF/CodeCommit/PipelineCodeCommit
@@ -68,14 +62,6 @@ Parameters:
     Description: Environment name
     Type: String
     AllowedValues: [dev, test, prod]
-  pSdlfModuleDomain:
-    Type: String
-    Default: awslabs
-    Description: "A placeholder domain used for default SDLF components"
-  pSdlfModuleTeam:
-    Type: String
-    Default: sdlf
-    Description: "A placeholder team used for default SDLF components"
   pDatalakeLibsLambdaLayerName:
     Description: Name to give the Lambda Layer containing the Datalake Library.
     Type: String
